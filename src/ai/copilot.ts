@@ -1,10 +1,63 @@
 const COPILOT_CHAT_URL = "https://api.githubcopilot.com/chat/completions";
+const COPILOT_TOKEN_URL = "https://api.github.com/copilot_internal/v2/token";
 
-export async function chatCopilot(prompt: string, token: string): Promise<string> {
+interface CopilotTokenResponse {
+  token: string;
+  expires_at: number;
+}
+
+let cachedToken: string | undefined;
+let tokenExpiresAt = 0;
+
+async function getValidToken(token: string | undefined, refreshToken: string | undefined): Promise<string> {
+  // If we have a cached token that's still valid (with 60s buffer), use it
+  if (cachedToken && Date.now() / 1000 < tokenExpiresAt - 60) {
+    return cachedToken;
+  }
+
+  // Try refreshing using the GitHub OAuth token
+  if (refreshToken) {
+    try {
+      const response = await fetch(COPILOT_TOKEN_URL, {
+        method: "GET",
+        headers: {
+          "Authorization": `token ${refreshToken}`,
+          "Accept": "application/json",
+          "User-Agent": "evo-scry/1.0.0",
+        },
+        signal: AbortSignal.timeout(10_000),
+      });
+
+      if (response.ok) {
+        const data = (await response.json()) as CopilotTokenResponse;
+        cachedToken = data.token;
+        tokenExpiresAt = data.expires_at;
+        return cachedToken;
+      }
+    } catch {
+      // Fall through to use the static token
+    }
+  }
+
+  // Fall back to the static token from env
+  if (token) {
+    return token;
+  }
+
+  throw new Error("No valid Copilot token available");
+}
+
+export async function chatCopilot(
+  prompt: string,
+  token: string,
+  refreshToken?: string,
+): Promise<string> {
+  const validToken = await getValidToken(token, refreshToken);
+
   const response = await fetch(COPILOT_CHAT_URL, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${token}`,
+      "Authorization": `Bearer ${validToken}`,
       "Content-Type": "application/json",
       "Editor-Version": "vscode/1.96.0",
       "Editor-Plugin-Version": "copilot-chat/0.24.0",

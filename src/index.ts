@@ -47,10 +47,17 @@ server.tool(
       .describe("Generate AI summary of top results (default: false)"),
   },
   async (args) => {
-    const response = await executeWebSearch(args);
-    return {
-      content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
-    };
+    try {
+      const response = await executeWebSearch(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
+      };
+    } catch (err) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: `web_search failed: ${(err as Error).message}` }],
+      };
+    }
   },
 );
 
@@ -74,10 +81,17 @@ server.tool(
       .describe("Date range filter"),
   },
   async (args) => {
-    const response = await executeSearchGoogle(args);
-    return {
-      content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
-    };
+    try {
+      const response = await executeSearchGoogle(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
+      };
+    } catch (err) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: `search_google failed: ${(err as Error).message}` }],
+      };
+    }
   },
 );
 
@@ -101,10 +115,17 @@ server.tool(
       .describe("Date range filter"),
   },
   async (args) => {
-    const response = await executeSearchDdg(args);
-    return {
-      content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
-    };
+    try {
+      const response = await executeSearchDdg(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
+      };
+    } catch (err) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: `search_duckduckgo failed: ${(err as Error).message}` }],
+      };
+    }
   },
 );
 
@@ -122,10 +143,17 @@ server.tool(
       .describe('Output format (default: "markdown")'),
   },
   async (args) => {
-    const results = await executeExtractContent(args);
-    return {
-      content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
-    };
+    try {
+      const results = await executeExtractContent(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+      };
+    } catch (err) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: `extract_content failed: ${(err as Error).message}` }],
+      };
+    }
   },
 );
 
@@ -141,19 +169,37 @@ async function main() {
     await server.connect(httpTransport);
 
     const httpServer = createServer(async (req, res) => {
-      if (req.method === "POST" && req.url === "/mcp") {
-        const body = await collectBody(req);
-        const fakeReq = {
-          ...req,
-          body: JSON.parse(body),
-        } as unknown as Parameters<typeof httpTransport.handleRequest>[0];
-        await httpTransport.handleRequest(fakeReq, res);
-      } else if (req.method === "GET" && req.url === "/health") {
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ status: "ok", name: "evo-scry", version: "1.0.0" }));
-      } else {
-        res.writeHead(404);
-        res.end("Not found");
+      try {
+        if (req.method === "POST" && req.url === "/mcp") {
+          const body = await collectBody(req);
+          const fakeReq = {
+            ...req,
+            body: JSON.parse(body),
+          } as unknown as Parameters<typeof httpTransport.handleRequest>[0];
+          await httpTransport.handleRequest(fakeReq, res);
+        } else if (req.method === "GET" && req.url === "/health") {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ status: "ok", name: "evo-scry", version: "1.0.0" }));
+        } else {
+          res.writeHead(404);
+          res.end("Not found");
+        }
+      } catch (err) {
+        log("error", `HTTP request error: ${(err as Error).message}`);
+        if (!res.headersSent) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Bad request" }));
+        }
+      }
+    });
+
+    httpServer.on("error", (err) => {
+      log("error", `HTTP server error: ${err.message}`);
+    });
+
+    httpServer.on("clientError", (_err, socket) => {
+      if (socket.writable) {
+        socket.end("HTTP/1.1 400 Bad Request\r\n\r\n");
       }
     });
 
@@ -169,9 +215,19 @@ async function main() {
 }
 
 function collectBody(req: import("node:http").IncomingMessage): Promise<string> {
+  const MAX_BODY_SIZE = 1_048_576; // 1MB
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    let size = 0;
+    req.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > MAX_BODY_SIZE) {
+        req.destroy();
+        reject(new Error("Request body too large"));
+        return;
+      }
+      chunks.push(chunk);
+    });
     req.on("end", () => resolve(Buffer.concat(chunks).toString()));
     req.on("error", reject);
   });

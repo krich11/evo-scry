@@ -30,7 +30,7 @@ async function chatWithAI(prompt: string): Promise<string> {
   // Try Copilot first
   if (config.copilotToken) {
     try {
-      return await chatCopilot(prompt, config.copilotToken);
+      return await chatCopilot(prompt, config.copilotToken, config.copilotRefreshToken);
     } catch {
       // Fall through to local model
     }
