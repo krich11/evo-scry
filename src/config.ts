@@ -15,7 +15,7 @@ export interface Config {
 }
 
 export function loadConfig(): Config {
-  const engines = (process.env.EVOSCRY_SEARCH_ENGINES || "google,duckduckgo")
+  const engines = (process.env.EVOSCRY_SEARCH_ENGINES || "duckduckgo")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter((e): e is "google" | "duckduckgo" => e === "google" || e === "duckduckgo");
@@ -29,7 +29,7 @@ export function loadConfig(): Config {
   return {
     transport: process.env.EVOSCRY_TRANSPORT === "http" ? "http" : "stdio",
     port: parseInt(process.env.EVOSCRY_PORT || "3000", 10),
-    searchEngines: engines.length > 0 ? engines : ["google", "duckduckgo"],
+    searchEngines: engines.length > 0 ? engines : ["duckduckgo"],
     maxResults: parseInt(process.env.EVOSCRY_MAX_RESULTS || "10", 10),
     requestDelayMs: parseInt(process.env.EVOSCRY_REQUEST_DELAY_MS || "1000", 10),
     userAgent: process.env.EVOSCRY_USER_AGENT || "rotate",

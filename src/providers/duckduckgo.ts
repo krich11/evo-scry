@@ -25,11 +25,15 @@ function parseDuckDuckGoResults(html: string, maxResults: number): RawSearchResu
   $(".result.results_links").each((_i, el) => {
     if (results.length >= maxResults) return false;
 
+    // Skip sponsored/ad results
+    if ($(el).hasClass("result--ad")) return;
+    if ($(el).find(".badge--ad").length > 0) return;
+
     const titleEl = $(el).find(".result__title a");
     const snippetEl = $(el).find(".result__snippet");
     const urlEl = $(el).find(".result__url");
 
-    const title = titleEl.text().trim();
+    const title = titleEl.text().trim().replace(/more info$/i, "");
     const snippet = snippetEl.text().trim();
 
     // DuckDuckGo wraps URLs in redirect links — extract actual URL from uddg param
@@ -50,6 +54,11 @@ function parseDuckDuckGoResults(html: string, maxResults: number): RawSearchResu
       if (displayUrl) {
         resultUrl = displayUrl.startsWith("http") ? displayUrl : `https://${displayUrl}`;
       }
+    }
+
+    // Filter out ad redirect URLs
+    if (resultUrl.includes("duckduckgo.com/y.js") || resultUrl.includes("ad_provider=")) {
+      return;
     }
 
     if (title && resultUrl) {
