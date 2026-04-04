@@ -1,8 +1,14 @@
-"""Google HTML scraper."""
+"""Google HTML scraper.
+
+NOTE: As of early 2026, Google requires JavaScript to render search results.
+This scraper may return zero results. DuckDuckGo is the recommended default.
+A future version may add headless browser support.
+"""
 
 from __future__ import annotations
 
 import re
+import sys
 from datetime import datetime
 from urllib.parse import urlencode
 
@@ -26,7 +32,10 @@ async def search_google(
     language: str = "en",
     date_range: str | None = None,
 ) -> list[dict]:
-    """Scrape Google HTML search and return raw results."""
+    """Scrape Google HTML search and return raw results.
+
+    May return empty list if Google requires JavaScript rendering.
+    """
     params: dict[str, str] = {
         "q": query,
         "num": str(min(max_results + 5, 40)),
@@ -45,6 +54,15 @@ async def search_google(
         )
     if resp.status_code != 200:
         raise RuntimeError(f"Google returned HTTP {resp.status_code}")
+
+    # Detect JS-gated page (Google now requires JavaScript for search results)
+    if "enablejs" in resp.text or ("<noscript" in resp.text and "div.g" not in resp.text):
+        print(
+            "[evo-scry] Warning: Google returned a JavaScript-required page. "
+            "Google HTML scraping is no longer reliable. Use DuckDuckGo instead.",
+            file=sys.stderr,
+        )
+        return []
 
     return _parse(resp.text, max_results)
 

@@ -41,6 +41,8 @@ mcp = FastMCP(
         "Tips:\n"
         "- DuckDuckGo is the default engine and most reliable (no rate limits).\n"
         "- Google may rate-limit; use date_range filters when possible.\n"
+        "- Google now requires JavaScript — scraping may return empty results. "
+        "DuckDuckGo is strongly recommended.\n"
         "- Set summarize=true on web_search to get an AI summary of results.\n"
         "- Use extract_content after searching to read promising articles.\n"
     ),
