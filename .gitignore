@@ -1,5 +1,30 @@
-node_modules/
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
 dist/
+build/
+*.whl
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Environment
 .env
-*.tsbuildinfo
+*.env.local
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Node (legacy)
+node_modules/

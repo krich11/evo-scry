@@ -6,7 +6,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/node /opt/evo-scry/dist/index.js
+ExecStart=/opt/evo-scry/venv/bin/python -m evoscry.mcp_server --transport sse
 WorkingDirectory=/opt/evo-scry
 Restart=on-failure
 RestartSec=5
