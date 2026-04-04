@@ -1,0 +1,41 @@
+[Unit]
+Description=evo-scry MCP Internet Search Server
+Documentation=https://github.com/krich11/evo-scry
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node /opt/evo-scry/dist/index.js
+WorkingDirectory=/opt/evo-scry
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=evo-scry
+
+# Environment configuration
+EnvironmentFile=-/etc/evo-scry/evo-scry.env
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+
+# Resource limits
+MemoryMax=512M
+CPUQuota=50%
+
+# Run as dedicated user (create with install.sh)
+User=evo-scry
+Group=evo-scry
+
+[Install]
+WantedBy=multi-user.target
