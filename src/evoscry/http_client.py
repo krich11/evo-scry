@@ -71,6 +71,34 @@ async def fetch_with_config(url: str) -> httpx.Response:
         return await client.get(url, headers=headers)
 
 
+async def post_with_config(url: str, data: dict) -> httpx.Response:
+    """POST form data with rate limiting, UA rotation, and timeout."""
+    await _enforce_delay()
+
+    headers = {
+        "User-Agent": _get_user_agent(),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Referer": "https://duckduckgo.com/",
+        "Origin": "https://duckduckgo.com",
+        "DNT": "1",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+    }
+
+    config = load_config()
+    proxy = config.proxy_url
+
+    async with httpx.AsyncClient(
+        follow_redirects=True,
+        timeout=10.0,
+        proxy=proxy,
+    ) as client:
+        return await client.post(url, data=data, headers=headers)
+
+
 async def fetch_url(url: str) -> str:
     """Fetch URL and return body text."""
     resp = await fetch_with_config(url)

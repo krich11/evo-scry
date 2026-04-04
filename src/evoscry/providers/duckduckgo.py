@@ -6,19 +6,34 @@ from urllib.parse import parse_qs, urlparse
 
 from bs4 import BeautifulSoup
 
-from evoscry.http_client import fetch_with_config
+from evoscry.http_client import post_with_config
 
 DDG_HTML_URL = "https://html.duckduckgo.com/html/"
+
+# Date range mapping for DDG
+_DDG_DATE_MAP = {
+    "day": "d",
+    "week": "w",
+    "month": "m",
+    "year": "y",
+}
 
 
 async def search_duckduckgo(
     query: str,
     max_results: int = 10,
+    date_range: str | None = None,
     **_kwargs,
 ) -> list[dict]:
-    """Scrape DuckDuckGo HTML search and return raw results."""
-    url = f"{DDG_HTML_URL}?q={query}"
-    resp = await fetch_with_config(url)
+    """Scrape DuckDuckGo HTML search via POST (avoids 202 bot detection)."""
+    form_data: dict[str, str] = {
+        "q": query,
+        "b": "",
+    }
+    if date_range and date_range in _DDG_DATE_MAP:
+        form_data["df"] = _DDG_DATE_MAP[date_range]
+
+    resp = await post_with_config(DDG_HTML_URL, data=form_data)
     if resp.status_code != 200:
         raise RuntimeError(f"DuckDuckGo returned HTTP {resp.status_code}")
     return _parse(resp.text, max_results)
