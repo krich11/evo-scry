@@ -45,6 +45,8 @@ mcp = FastMCP(
         "Use Bing or DuckDuckGo instead.\n"
         "- Set summarize=true on web_search to get an AI summary of results.\n"
         "- Use extract_content after searching to read promising articles.\n"
+        "- Use fetch_raw to inspect a page's full HTML structure, headers, "
+        "meta tags, and technology stack.\n"
     ),
 )
 
@@ -190,6 +192,33 @@ async def extract_content(
 
     urls = [url] if isinstance(url, str) else url
     results = await _extract(urls, fmt=format)
+    return json.dumps(results, indent=2)
+
+
+@mcp.tool()
+async def fetch_raw(
+    url: str | list[str],
+    strip_noise: bool = True,
+) -> str:
+    """Fetch one or more URLs and return raw HTTP headers + HTML body.
+
+    Unlike extract_content, this preserves the full page structure so
+    you can inspect meta tags, JSON-LD, Open Graph data, script/link
+    references, DOM layout, forms, and HTTP response headers.
+
+    By default, inline script and style contents are replaced with a
+    placeholder to reduce noise while keeping the tags (so you can see
+    what resources are loaded). Set strip_noise=false for completely raw HTML.
+
+    Args:
+        url: URL or list of URLs to fetch.
+        strip_noise: Strip inline script/style contents (default: true).
+                     Tags and their attributes are preserved.
+    """
+    from evoscry.fetch_raw import fetch_raw as _fetch_raw
+
+    urls = [url] if isinstance(url, str) else url
+    results = await _fetch_raw(urls, strip_noise=strip_noise)
     return json.dumps(results, indent=2)
 
 
