@@ -9,6 +9,7 @@ from evoscry.config import load_config
 from evoscry.normalize.dedup import deduplicate
 from evoscry.normalize.rank import rank_results
 from evoscry.normalize.summarize import summarize_results
+from evoscry.providers.bing import search_bing
 from evoscry.providers.duckduckgo import search_duckduckgo
 from evoscry.providers.google import search_google
 
@@ -28,7 +29,7 @@ async def execute_web_search(
         raise ValueError("Search query cannot be empty")
 
     engines = engines or config.search_engines
-    engines = [e for e in engines if e in ("google", "duckduckgo")]
+    engines = [e for e in engines if e in ("google", "duckduckgo", "bing")]
     max_results = max_results or config.max_results
 
     # Check cache
@@ -56,6 +57,10 @@ async def execute_web_search(
             elif engine == "duckduckgo":
                 tasks.append(
                     _safe_search(search_duckduckgo, query, max_results, language, date_range, engine_errors)
+                )
+            elif engine == "bing":
+                tasks.append(
+                    _safe_search(search_bing, query, max_results, language, date_range, engine_errors)
                 )
 
         result_sets = await asyncio.gather(*tasks)
@@ -110,6 +115,19 @@ async def execute_search_ddg(
     raw = await search_duckduckgo(query, max_results)
     ranked = rank_results(raw, query)
     return {"query": query, "engine": "duckduckgo", "total_results": len(ranked), "results": ranked[:max_results]}
+
+
+async def execute_search_bing(
+    query: str,
+    max_results: int | None = None,
+    language: str = "en",
+    date_range: str | None = None,
+) -> dict:
+    config = load_config()
+    max_results = max_results or config.max_results
+    raw = await search_bing(query, max_results, language, date_range)
+    ranked = rank_results(raw, query)
+    return {"query": query, "engine": "bing", "total_results": len(ranked), "results": ranked[:max_results]}
 
 
 async def _safe_search(fn, query, max_results, language, date_range, errors):

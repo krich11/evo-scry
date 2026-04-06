@@ -11,7 +11,7 @@ class Config:
     transport: str = "stdio"  # "stdio" | "sse" | "streamable-http"
     host: str = "0.0.0.0"
     port: int = 3000
-    search_engines: list[str] = field(default_factory=lambda: ["duckduckgo"])
+    search_engines: list[str] = field(default_factory=lambda: ["duckduckgo", "bing"])
     max_results: int = 10
     request_delay_ms: int = 1000
     user_agent: str = "rotate"
@@ -25,11 +25,11 @@ class Config:
 
 
 def load_config() -> Config:
-    engines_raw = os.environ.get("EVOSCRY_SEARCH_ENGINES", "duckduckgo")
+    engines_raw = os.environ.get("EVOSCRY_SEARCH_ENGINES", "duckduckgo,bing")
     engines = [
         e.strip().lower()
         for e in engines_raw.split(",")
-        if e.strip().lower() in ("google", "duckduckgo")
+        if e.strip().lower() in ("google", "duckduckgo", "bing")
     ]
     if not engines:
         engines = ["duckduckgo"]

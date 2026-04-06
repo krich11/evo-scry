@@ -36,13 +36,13 @@ mcp = FastMCP(
     instructions=(
         "You have access to EvoScry, an internet search server. "
         "Use web_search for general queries (aggregates multiple engines), "
-        "search_google or search_duckduckgo for engine-specific searches, "
+        "search_bing or search_duckduckgo for engine-specific searches, "
         "and extract_content to read full articles from URLs.\n\n"
         "Tips:\n"
         "- DuckDuckGo is the default engine and most reliable (no rate limits).\n"
-        "- Google may rate-limit; use date_range filters when possible.\n"
-        "- Google now requires JavaScript — scraping may return empty results. "
-        "DuckDuckGo is strongly recommended.\n"
+        "- Bing is the recommended second engine for result diversity.\n"
+        "- Google is deprecated — it requires JavaScript and returns empty results. "
+        "Use Bing or DuckDuckGo instead.\n"
         "- Set summarize=true on web_search to get an AI summary of results.\n"
         "- Use extract_content after searching to read promising articles.\n"
     ),
@@ -69,7 +69,7 @@ async def web_search(
 
     Args:
         query: Search query text.
-        engines: Engines to query (default: configured engines). Options: "google", "duckduckgo".
+        engines: Engines to query (default: configured engines). Options: "bing", "duckduckgo", "google" (deprecated).
         max_results: Maximum results to return (default: 10).
         language: Language code ISO 639-1 (default: "en").
         date_range: Date range filter: "day", "week", "month", "year".
@@ -95,7 +95,9 @@ async def search_google(
     language: str = "en",
     date_range: str | None = None,
 ) -> str:
-    """Search Google directly. Returns parsed results from Google's HTML search page.
+    """[DEPRECATED] Search Google directly. Google now requires JavaScript
+    rendering and this tool typically returns empty results.
+    Use search_bing or search_duckduckgo instead.
 
     Args:
         query: Search query text.
@@ -134,6 +136,35 @@ async def search_duckduckgo(
     from evoscry.search import execute_search_ddg
 
     response = await execute_search_ddg(
+        query=query,
+        max_results=max_results,
+        language=language,
+        date_range=date_range,
+    )
+    return json.dumps(response, indent=2)
+
+
+@mcp.tool()
+async def search_bing(
+    query: str,
+    max_results: int | None = None,
+    language: str = "en",
+    date_range: str | None = None,
+) -> str:
+    """Search Bing directly. Returns parsed results from Bing's HTML search page.
+
+    Bing is less aggressive with bot detection than Google and does not
+    require JavaScript rendering.
+
+    Args:
+        query: Search query text.
+        max_results: Maximum results to return (default: 10).
+        language: Language code (default: "en").
+        date_range: Date range filter: "day", "week", "month", "year".
+    """
+    from evoscry.search import execute_search_bing
+
+    response = await execute_search_bing(
         query=query,
         max_results=max_results,
         language=language,
