@@ -1,1 +1,1 @@
-"""Search providers package — Bing, DuckDuckGo, Google (deprecated)."""
+"""Search providers package — Bing, Brave, DuckDuckGo, Google (deprecated)."""

@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "evo-scry"
-version = "2.0.0"
-description = "MCP server for internet search via DuckDuckGo and Google HTML scraping"
+version = "2.1.0"
+description = "MCP server for internet search via DuckDuckGo, Bing, Brave, and Google HTML scraping"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
@@ -24,6 +24,9 @@ dev = [
     "ruff>=0.4",
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
+]
+pdf = [
+    "pymupdf>=1.24",
 ]
 
 [project.scripts]

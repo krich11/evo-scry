@@ -1,10 +1,13 @@
-"""EvoScry MCP Server — internet search via DuckDuckGo and Google HTML scraping.
+"""EvoScry MCP Server — internet search via DuckDuckGo, Bing, Brave, and Google HTML scraping.
 
-Tools (4):
-    web_search       — multi-engine search with dedup, ranking, optional AI summary
-    search_google    — Google-only search
+Tools (7):
+    web_search        — multi-engine search with dedup, ranking, optional AI summary
+    search_google     — Google-only search (deprecated)
     search_duckduckgo — DuckDuckGo-only search
-    extract_content  — fetch URLs and extract clean text/Markdown
+    search_bing       — Bing-only search
+    search_brave      — Brave-only search
+    site_search       — domain-scoped search via site: prefix
+    extract_content   — fetch URLs and extract clean text/Markdown
 
 Run with::
 
@@ -36,17 +39,20 @@ mcp = FastMCP(
     instructions=(
         "You have access to EvoScry, an internet search server. "
         "Use web_search for general queries (aggregates multiple engines), "
-        "search_bing or search_duckduckgo for engine-specific searches, "
+        "search_bing, search_duckduckgo, or search_brave for engine-specific searches, "
         "and extract_content to read full articles from URLs.\n\n"
         "Tips:\n"
         "- DuckDuckGo is the default engine and most reliable (no rate limits).\n"
         "- Bing is the recommended second engine for result diversity.\n"
+        "- Brave is a privacy-focused third engine with good technical-content indexing.\n"
         "- Google is deprecated — it requires JavaScript and returns empty results. "
-        "Use Bing or DuckDuckGo instead.\n"
+        "Use Bing, DuckDuckGo, or Brave instead.\n"
         "- Set summarize=true on web_search to get an AI summary of results.\n"
         "- Use extract_content after searching to read promising articles.\n"
         "- Use fetch_raw to inspect a page's full HTML structure, headers, "
         "meta tags, and technology stack.\n"
+        "- Date filtering: set date_range to 'day', 'week', 'month', or 'year' "
+        "to restrict results by recency. DuckDuckGo and Bing support this reliably.\n"
     ),
 )
 
@@ -63,19 +69,21 @@ async def web_search(
     language: str = "en",
     date_range: str | None = None,
     summarize: bool = False,
+    expand: bool = False,
 ) -> str:
-    """Search the internet using Google and DuckDuckGo.
+    """Search the internet using multiple search engines.
 
     Results are aggregated, deduplicated, and ranked by relevance.
     Optionally summarized using AI.
 
     Args:
         query: Search query text.
-        engines: Engines to query (default: configured engines). Options: "bing", "duckduckgo", "google" (deprecated).
+        engines: Engines to query (default: configured engines). Options: "bing", "brave", "duckduckgo", "google" (deprecated).
         max_results: Maximum results to return (default: 10).
         language: Language code ISO 639-1 (default: "en").
-        date_range: Date range filter: "day", "week", "month", "year".
+        date_range: Date range filter: "day", "week", "month", "year". DuckDuckGo and Bing are most reliable.
         summarize: Generate AI summary of top results (default: false).
+        expand: Use AI to generate alternate query phrasings for broader recall (default: false).
     """
     from evoscry.search import execute_web_search
 
@@ -86,6 +94,7 @@ async def web_search(
         language=language,
         date_range=date_range,
         summarize=summarize,
+        expand=expand,
     )
     return json.dumps(response, indent=2)
 
@@ -168,6 +177,69 @@ async def search_bing(
 
     response = await execute_search_bing(
         query=query,
+        max_results=max_results,
+        language=language,
+        date_range=date_range,
+    )
+    return json.dumps(response, indent=2)
+
+
+@mcp.tool()
+async def search_brave(
+    query: str,
+    max_results: int | None = None,
+    language: str = "en",
+    date_range: str | None = None,
+) -> str:
+    """Search Brave directly. Privacy-focused engine with good technical-content indexing.
+
+    Does not require JavaScript rendering.
+
+    Args:
+        query: Search query text.
+        max_results: Maximum results to return (default: 10).
+        language: Language code (default: "en").
+        date_range: Date range filter: "day", "week", "month", "year".
+    """
+    from evoscry.search import execute_search_brave
+
+    response = await execute_search_brave(
+        query=query,
+        max_results=max_results,
+        language=language,
+        date_range=date_range,
+    )
+    return json.dumps(response, indent=2)
+
+
+@mcp.tool()
+async def site_search(
+    query: str,
+    site: str,
+    engines: list[str] | None = None,
+    max_results: int | None = None,
+    language: str = "en",
+    date_range: str | None = None,
+) -> str:
+    """Search within a specific domain using ``site:`` restriction.
+
+    Restricts results to a single domain. Useful for searching documentation
+    sites, specific repos, etc.
+
+    Args:
+        query: Search query text.
+        site: Domain to restrict to (e.g., "docs.python.org").
+        engines: Engines to query (default: configured engines).
+        max_results: Maximum results to return (default: 10).
+        language: Language code (default: "en").
+        date_range: Date range filter: "day", "week", "month", "year".
+    """
+    from evoscry.search import execute_site_search
+
+    response = await execute_site_search(
+        query=query,
+        site=site,
+        engines=engines,
         max_results=max_results,
         language=language,
         date_range=date_range,
@@ -264,14 +336,88 @@ def _build_dual_transport_app():
 
     # ── REST endpoints ──
     async def health_endpoint(request: Request) -> Response:
+        from evoscry.circuit_breaker import all_breaker_statuses
+        from evoscry.config import load_config as _load_config
+        from evoscry.metrics import metrics
+
+        cfg = _load_config()
+        breakers = all_breaker_statuses()
+
+        engines_health: dict = {}
+        for engine in cfg.search_engines:
+            b = breakers.get(engine, {})
+            engines_health[engine] = {
+                "state": b.get("state", "closed"),
+                "searches": metrics.searches_by_engine.get(engine, 0),
+                "errors": metrics.errors_by_engine.get(engine, 0),
+                "last_success": metrics._iso(metrics.last_success_by_engine.get(engine)),
+                "last_failure": metrics._iso(metrics.last_failure_by_engine.get(engine)),
+            }
+
+        body = {
+            "status": "healthy",
+            "name": "evo-scry",
+            "version": "2.1.0",
+            "uptime_seconds": round(metrics.uptime_seconds, 1),
+            "engines": engines_health,
+            "cache": {
+                "size": metrics.cache_size,
+                "max_size": 100,
+                "hits": metrics.cache_hits,
+                "misses": metrics.cache_misses,
+                "evictions": metrics.cache_evictions,
+                "hit_rate": round(metrics.cache_hit_rate, 3),
+            },
+            "ai": {
+                "copilot_configured": cfg.copilot_token is not None or cfg.copilot_refresh_token is not None,
+                "ollama_configured": cfg.local_model_url is not None,
+                "calls_total": metrics.ai_calls_total,
+                "calls_failed": metrics.ai_calls_failed,
+            },
+            "config": {
+                "transport": cfg.transport,
+                "engines": cfg.search_engines,
+                "max_results": cfg.max_results,
+                "cache_ttl_seconds": cfg.cache_ttl_seconds,
+            },
+        }
         return Response(
-            json.dumps({"ok": True, "name": "evo-scry", "version": "2.0.0"}),
+            json.dumps(body, indent=2),
             media_type="application/json",
+        )
+
+    async def readiness_endpoint(request: Request) -> Response:
+        from evoscry.circuit_breaker import all_breaker_statuses
+        from evoscry.config import load_config as _load_config
+
+        cfg = _load_config()
+        breakers = all_breaker_statuses()
+
+        # At least one configured engine must not be OPEN
+        engine_ok = any(
+            breakers.get(e, {}).get("state", "closed") != "open"
+            for e in cfg.search_engines
+        )
+
+        ready = engine_ok
+        body = {
+            "ready": ready,
+            "checks": {
+                "at_least_one_engine_healthy": engine_ok,
+                "cache_initialized": True,
+            },
+        }
+        status = 200 if ready else 503
+        return Response(
+            json.dumps(body, indent=2),
+            media_type="application/json",
+            status_code=status,
         )
 
     # ── Combined routes ──
     routes = [
         Route("/health", endpoint=health_endpoint, methods=["GET"]),
+        Route("/readiness", endpoint=readiness_endpoint, methods=["GET"]),
         # SSE stream — GET only
         Route("/sse", endpoint=sse_endpoint, methods=["GET"]),
         # Streamable-HTTP — POST, DELETE on /sse
@@ -313,6 +459,24 @@ def main() -> None:
     transport = args.transport or os.environ.get("EVOSCRY_TRANSPORT", "stdio")
     host = args.host or os.environ.get("EVOSCRY_HOST", "0.0.0.0")
     port = args.port or int(os.environ.get("EVOSCRY_PORT", "3000"))
+
+    # ── Logging setup ──
+    from evoscry.config import load_config as _load_cfg
+
+    _cfg = _load_cfg()
+    import logging
+
+    logging.basicConfig(level=getattr(logging, _cfg.log_level.upper(), logging.INFO))
+
+    if _cfg.anonymize_logs:
+        from evoscry.log_filter import AnonymizeFilter
+
+        anon = AnonymizeFilter()
+        root = logging.getLogger()
+        root.addFilter(anon)
+        for handler in root.handlers:
+            handler.addFilter(anon)
+        logging.info("Query anonymization enabled in logs")
 
     if transport in ("sse", "streamable-http"):
         mcp.settings.host = host

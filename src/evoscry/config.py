@@ -22,6 +22,10 @@ class Config:
     local_model_name: str = "llama3"
     log_level: str = "info"
     cache_ttl_seconds: int = 300
+    circuit_failure_threshold: int = 5
+    circuit_recovery_timeout: int = 60
+    query_expansion_max: int = 3
+    anonymize_logs: bool = False
 
 
 def load_config() -> Config:
@@ -29,7 +33,7 @@ def load_config() -> Config:
     engines = [
         e.strip().lower()
         for e in engines_raw.split(",")
-        if e.strip().lower() in ("google", "duckduckgo", "bing")
+        if e.strip().lower() in ("google", "duckduckgo", "bing", "brave")
     ]
     if not engines:
         engines = ["duckduckgo"]
@@ -53,4 +57,8 @@ def load_config() -> Config:
         local_model_name=os.environ.get("EVOSCRY_LOCAL_MODEL_NAME", "llama3"),
         log_level=log_level,
         cache_ttl_seconds=int(os.environ.get("EVOSCRY_CACHE_TTL_SECONDS", "300")),
+        circuit_failure_threshold=int(os.environ.get("EVOSCRY_CIRCUIT_FAILURE_THRESHOLD", "5")),
+        circuit_recovery_timeout=int(os.environ.get("EVOSCRY_CIRCUIT_RECOVERY_TIMEOUT", "60")),
+        query_expansion_max=int(os.environ.get("EVOSCRY_QUERY_EXPANSION_MAX", "3")),
+        anonymize_logs=os.environ.get("EVOSCRY_ANONYMIZE_LOGS", "false").lower() == "true",
     )

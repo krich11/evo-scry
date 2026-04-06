@@ -6,6 +6,7 @@ import re
 from datetime import datetime, timezone
 
 from evoscry.normalize.dedup import extract_domain
+from evoscry.normalize.filter import snippet_quality
 
 # Domain authority tiers
 DOMAIN_AUTHORITY: dict[str, float] = {
@@ -34,11 +35,12 @@ DOMAIN_PATTERNS: list[tuple[re.Pattern, float]] = [
     (re.compile(r"^wiki\."), 0.70),
 ]
 
-# Scoring weights
-W_POSITION = 0.40
-W_KEYWORD = 0.25
-W_AUTHORITY = 0.20
-W_FRESHNESS = 0.15
+# Scoring weights (sum = 1.0)
+W_POSITION = 0.35
+W_KEYWORD = 0.22
+W_AUTHORITY = 0.18
+W_FRESHNESS = 0.13
+W_SNIPPET = 0.12
 CROSS_ENGINE_BOOST = 1.2
 
 
@@ -94,12 +96,14 @@ def rank_results(raw: list[dict], query: str) -> list[dict]:
         keyword = _keyword_match(query, r.get("title", ""), r.get("snippet", ""))
         authority = _get_domain_authority(domain)
         freshness = _freshness_score(r.get("published_date"))
+        snip_q = snippet_quality(r.get("snippet"))
 
         score = (
             W_POSITION * position
             + W_KEYWORD * keyword
             + W_AUTHORITY * authority
             + W_FRESHNESS * freshness
+            + W_SNIPPET * snip_q
         )
 
         # Cross-engine boost

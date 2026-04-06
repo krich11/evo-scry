@@ -1,1 +1,1 @@
-"""Normalization package — deduplication, ranking, summarization."""
+"""Normalization package — deduplication, ranking, filtering, summarization."""
