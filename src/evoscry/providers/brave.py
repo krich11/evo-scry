@@ -1,14 +1,16 @@
 """Brave Search HTML scraper.
 
 Brave's HTML search endpoint does not require JavaScript rendering,
-making it a reliable third engine alongside DuckDuckGo and Bing.
+similar to DuckDuckGo's html endpoint.
 """
 
 from __future__ import annotations
 
 import re
 from datetime import datetime
+from urllib.parse import urlencode
 
+import httpx
 from bs4 import BeautifulSoup
 
 from evoscry.http_client import fetch_with_config
@@ -22,7 +24,14 @@ DATE_RANGE_MAP = {
     "year": "py",
 }
 
-_DATE_PREFIX_RE = re.compile(r"^(\w{3}\s+\d{1,2},\s+\d{4})\s*[-—–]?\s*")
+# Mobile UAs reduce anti-bot friction
+_MOBILE_UAS = [
+    "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+]
+
+_ua_index = 0
 
 
 async def search_brave(
@@ -33,12 +42,15 @@ async def search_brave(
     **_kwargs,
 ) -> list[dict]:
     """Scrape Brave Search HTML results."""
-    params = f"q={_quote(query)}&source=web"
+    params: dict[str, str] = {
+        "q": query,
+        "source": "web",
+    }
     if date_range and date_range in DATE_RANGE_MAP:
-        params += f"&tf={DATE_RANGE_MAP[date_range]}"
+        params["tf"] = DATE_RANGE_MAP[date_range]
 
-    url = f"{BRAVE_SEARCH_URL}?{params}"
-    resp = await fetch_with_config(url)
+    url = f"{BRAVE_SEARCH_URL}?{urlencode(params)}"
+    resp = await _fetch_brave(url, language)
 
     if resp.status_code == 429:
         raise RuntimeError(
@@ -51,52 +63,83 @@ async def search_brave(
     return _parse(resp.text, max_results)
 
 
-def _quote(text: str) -> str:
-    """Minimal percent-encoding for query params."""
-    from urllib.parse import quote_plus
-    return quote_plus(text)
+async def _fetch_brave(url: str, language: str) -> httpx.Response:
+    """Fetch from Brave with mobile UA rotation via shared http_client."""
+    global _ua_index
+    from evoscry.config import load_config
+
+    config = load_config()
+
+    ua = _MOBILE_UAS[_ua_index % len(_MOBILE_UAS)]
+    _ua_index += 1
+
+    headers = {
+        "User-Agent": ua,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": f"{language},{language[:2]};q=0.9,en;q=0.8" if language != "en" else "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate",
+        "DNT": "1",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+    }
+
+    async with httpx.AsyncClient(
+        follow_redirects=True,
+        timeout=10.0,
+        proxy=config.proxy_url,
+    ) as client:
+        return await client.get(url, headers=headers)
 
 
 def _parse(html: str, max_results: int) -> list[dict]:
     soup = BeautifulSoup(html, "lxml")
     results: list[dict] = []
 
-    # Brave organic results live in #results > .snippet
-    for el in soup.select("#results .snippet"):
+    # Brave uses several possible result container selectors
+    for el in soup.select("div.snippet"):
         if len(results) >= max_results:
             break
 
         # Skip ads / sponsored
-        el_classes = el.get("class") or []
-        classes = " ".join(el_classes) if isinstance(el_classes, list) else str(el_classes)
-        if "ad" in classes or "sponsored" in classes:
+        classes = el.get("class") or []
+        class_str = " ".join(classes) if isinstance(classes, list) else str(classes)
+        if "ad" in class_str or "sponsored" in class_str:
             continue
 
         # Title + URL
-        link = el.select_one("a.snippet-title") or el.select_one("a[href^='http']")
+        link = el.select_one("a.snippet-title") or el.select_one("a[href]")
         if not link:
             continue
+
         href = str(link.get("href", "") or "")
+        title = link.get_text(strip=True)
         if not href.startswith("http"):
             continue
-        title = link.get_text(strip=True)
 
         # Snippet
-        desc = el.select_one("p.snippet-description") or el.select_one(".snippet-description")
-        snippet = desc.get_text(strip=True) if desc else ""
+        snippet = ""
+        desc = el.select_one("p.snippet-description") or el.select_one(".snippet-content")
+        if desc:
+            snippet = desc.get_text(strip=True)
+        if not snippet:
+            p = el.select_one("p")
+            if p:
+                snippet = p.get_text(strip=True)
 
-        # Published date
+        # Date extraction from snippet
         published_date = None
-        match = _DATE_PREFIX_RE.match(snippet)
-        if match:
+        date_match = re.match(
+            r"^(\w{3}\s+\d{1,2},\s+\d{4})\s*[·—–\-]\s*", snippet
+        )
+        if date_match:
             try:
-                dt = datetime.strptime(match.group(1), "%b %d, %Y")
-                published_date = dt.strftime("%Y-%m-%d")
-                snippet = snippet[match.end():]
+                d = datetime.strptime(date_match.group(1), "%b %d, %Y")
+                published_date = d.strftime("%Y-%m-%d")
+                snippet = snippet[date_match.end():]
             except ValueError:
                 pass
 
-        if title:
+        if title and href:
             results.append({
                 "title": title,
                 "url": href,
@@ -104,5 +147,33 @@ def _parse(html: str, max_results: int) -> list[dict]:
                 "engine": "brave",
                 "published_date": published_date,
             })
+
+    # Fallback: try broader selectors if div.snippet yields nothing
+    if not results:
+        for el in soup.select("#results .fdb"):
+            if len(results) >= max_results:
+                break
+
+            link = el.select_one("a[href]")
+            if not link:
+                continue
+            href = str(link.get("href", "") or "")
+            if not href.startswith("http"):
+                continue
+            title = link.get_text(strip=True)
+
+            snippet = ""
+            desc_el = el.select_one(".body")
+            if desc_el:
+                snippet = desc_el.get_text(strip=True)
+
+            if title and href:
+                results.append({
+                    "title": title,
+                    "url": href,
+                    "snippet": snippet,
+                    "engine": "brave",
+                    "published_date": None,
+                })
 
     return results

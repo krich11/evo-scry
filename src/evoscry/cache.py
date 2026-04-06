@@ -33,7 +33,6 @@ def cache_get(key: str) -> Any | None:
     if time.time() - ts > config.cache_ttl_seconds:
         _cache.pop(key, None)
         metrics.record_cache_miss()
-        metrics.cache_size = len(_cache)
         return None
     # Move to end (most recently used)
     _cache.move_to_end(key)
@@ -50,4 +49,8 @@ def cache_set(key: str, value: Any) -> None:
     while len(_cache) > _MAX_ENTRIES:
         _cache.popitem(last=False)
         metrics.record_cache_eviction()
-    metrics.cache_size = len(_cache)
+
+
+def cache_size() -> int:
+    """Return the current number of cached entries."""
+    return len(_cache)

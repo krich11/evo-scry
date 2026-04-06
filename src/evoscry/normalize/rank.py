@@ -96,14 +96,14 @@ def rank_results(raw: list[dict], query: str) -> list[dict]:
         keyword = _keyword_match(query, r.get("title", ""), r.get("snippet", ""))
         authority = _get_domain_authority(domain)
         freshness = _freshness_score(r.get("published_date"))
-        snip_q = snippet_quality(r.get("snippet"))
+        snip_quality = snippet_quality(r.get("snippet", ""))
 
         score = (
             W_POSITION * position
             + W_KEYWORD * keyword
             + W_AUTHORITY * authority
             + W_FRESHNESS * freshness
-            + W_SNIPPET * snip_q
+            + W_SNIPPET * snip_quality
         )
 
         # Cross-engine boost

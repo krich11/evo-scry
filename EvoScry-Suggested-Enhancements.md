@@ -9,30 +9,30 @@ All references to existing code correspond to the EvoScry v2.0.0 codebase as of 
 ## Table of Contents
 
 ### Search Quality
-- [E-01 — Brave Search Provider](#e-01--brave-search-provider) ✅
-- [E-02 — Query Expansion via LLM](#e-02--query-expansion-via-llm) ✅
-- [E-03 — Snippet Quality Scoring](#e-03--snippet-quality-scoring) ✅
-- [E-04 — Date-Restricted Search Hardening](#e-04--date-restricted-search-hardening) ⚠️
+- [E-01 — Brave Search Provider](#e-01--brave-search-provider)
+- [E-02 — Query Expansion via LLM](#e-02--query-expansion-via-llm)
+- [E-03 — Snippet Quality Scoring](#e-03--snippet-quality-scoring)
+- [E-04 — Date-Restricted Search Hardening](#e-04--date-restricted-search-hardening)
 
 ### Architecture & Reliability
 - [E-05 — Playwright Fallback for Google](#e-05--playwright-fallback-for-google)
-- [E-06 — Circuit Breaker Per Engine](#e-06--circuit-breaker-per-engine) ✅
-- [E-07 — Health and Readiness Probes](#e-07--health-and-readiness-probes) ✅
+- [E-06 — Circuit Breaker Per Engine](#e-06--circuit-breaker-per-engine)
+- [E-07 — Health and Readiness Probes](#e-07--health-and-readiness-probes)
 - [E-08 — Webhook Notification on Degradation](#e-08--webhook-notification-on-degradation)
 
 ### MCP-Native Features
 - [E-09 — MCP Resources for Curated Sources](#e-09--mcp-resources-for-curated-sources)
-- [E-10 — `site_search` Tool](#e-10--site_search-tool) ✅
+- [E-10 — `site_search` Tool](#e-10--site_search-tool)
 - [E-11 — `find_similar` Tool](#e-11--find_similar-tool)
 
 ### Content & Extraction
-- [E-12 — PDF and GitHub Content Extraction](#e-12--pdf-and-github-content-extraction) ✅
+- [E-12 — PDF and GitHub Content Extraction](#e-12--pdf-and-github-content-extraction)
 - [E-13 — Structured Data Extraction](#e-13--structured-data-extraction)
 - [E-14 — Screenshot Capture](#e-14--screenshot-capture)
 
 ### Privacy & Security
 - [E-15 — Tor Transport Option](#e-15--tor-transport-option)
-- [E-16 — Query Anonymization Log Mode](#e-16--query-anonymization-log-mode) ✅
+- [E-16 — Query Anonymization Log Mode](#e-16--query-anonymization-log-mode)
 
 ---
 
@@ -40,7 +40,7 @@ All references to existing code correspond to the EvoScry v2.0.0 codebase as of 
 
 ---
 
-### E-01 — Brave Search Provider ✅ IMPLEMENTED
+### E-01 — Brave Search Provider
 
 #### Summary
 
@@ -146,7 +146,7 @@ No new Python dependencies. Uses existing `httpx`, `beautifulsoup4`, `lxml`.
 
 ---
 
-### E-02 — Query Expansion via LLM ✅ IMPLEMENTED
+### E-02 — Query Expansion via LLM
 
 #### Summary
 
@@ -274,7 +274,7 @@ No new Python dependencies. Uses existing AI integration (`chat_copilot`, `chat_
 
 ---
 
-### E-03 — Snippet Quality Scoring ✅ IMPLEMENTED
+### E-03 — Snippet Quality Scoring
 
 #### Summary
 
@@ -397,7 +397,7 @@ No new Python dependencies. Uses `re` from stdlib.
 
 ---
 
-### E-04 — Date-Restricted Search Hardening ⚠️ PARTIAL
+### E-04 — Date-Restricted Search Hardening
 
 #### Summary
 
@@ -624,7 +624,7 @@ Post-install: `playwright install chromium` required to download browser binary.
 
 ---
 
-### E-06 — Circuit Breaker Per Engine ✅ IMPLEMENTED
+### E-06 — Circuit Breaker Per Engine
 
 #### Summary
 
@@ -766,7 +766,7 @@ No new dependencies. Uses `asyncio`, `enum`, `time` from stdlib.
 
 ---
 
-### E-07 — Health and Readiness Probes ✅ IMPLEMENTED
+### E-07 — Health and Readiness Probes
 
 #### Summary
 
@@ -1199,7 +1199,7 @@ No new dependencies. Uses `json` from stdlib and existing `mcp` library resource
 
 ---
 
-### E-10 — `site_search` Tool ✅ IMPLEMENTED
+### E-10 — `site_search` Tool
 
 #### Summary
 
@@ -1488,7 +1488,7 @@ No new Python dependencies. Uses `re`, `collections.Counter` from stdlib.
 
 ---
 
-### E-12 — PDF and GitHub Content Extraction ✅ IMPLEMENTED
+### E-12 — PDF and GitHub Content Extraction
 
 #### Summary
 
@@ -2256,7 +2256,7 @@ If `httpx[socks]` is not installed and Tor mode is enabled, raise a clear error 
 
 ---
 
-### E-16 — Query Anonymization Log Mode ✅ IMPLEMENTED
+### E-16 — Query Anonymization Log Mode
 
 #### Summary
 

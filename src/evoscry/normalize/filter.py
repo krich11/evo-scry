@@ -1,11 +1,11 @@
-"""Snippet quality scoring — penalizes low-information search result snippets."""
+"""Snippet quality scoring — penalize low-information snippets."""
 
 from __future__ import annotations
 
 import re
 
-# Compiled patterns that indicate low-quality snippets
-_LOW_QUALITY_PATTERNS: list[re.Pattern[str]] = [
+# Pre-compiled patterns that indicate low-quality / gated content
+_LOW_QUALITY_PATTERNS: list[re.Pattern] = [
     re.compile(p, re.IGNORECASE)
     for p in (
         r"sign\s*in",
@@ -27,26 +27,26 @@ _LOW_QUALITY_PATTERNS: list[re.Pattern[str]] = [
 ]
 
 
-def snippet_quality(snippet: str | None) -> float:
-    """Score a search-result snippet from 0.0 (garbage) to 1.0 (informative).
+def snippet_quality(snippet: str) -> float:
+    """Score a search result snippet from 0.0 (garbage) to 1.0 (high quality).
 
     Scoring factors:
-    * Length — very short snippets are penalized.
-    * Low-quality patterns — login prompts, paywalls, error pages.
-    * Lexical variety — repetitive text is penalized.
+    - Length (very short snippets are penalised)
+    - Low-quality content patterns (login walls, cookie prompts, errors)
+    - Word variety (repetitive text is penalised)
     """
     if not snippet:
         return 0.0
 
     stripped = snippet.strip()
-    if not stripped:
-        return 0.0
+    length = len(stripped)
 
-    if len(stripped) < 20:
+    if length < 20:
         return 0.1
-    if len(stripped) < 50:
+    if length < 50:
         return 0.4
 
+    # Pattern-based penalty
     penalty = 0.0
     for pattern in _LOW_QUALITY_PATTERNS:
         if pattern.search(stripped):
@@ -54,11 +54,11 @@ def snippet_quality(snippet: str | None) -> float:
 
     penalty = min(penalty, 0.9)
 
+    # Word variety check
     words = stripped.lower().split()
-    word_count = len(words)
-    if word_count > 0:
-        variety = len(set(words)) / word_count
+    if words:
+        variety = len(set(words)) / len(words)
         if variety < 0.3:
             penalty += 0.2
 
-    return max(0.0, 1.0 - penalty)
+    return max(0.0, min(1.0, 1.0 - penalty))
